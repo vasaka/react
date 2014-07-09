@@ -9,3 +9,6 @@ target_link_libraries(high_level react)
 
 add_executable(stats stats.cpp)
 target_link_libraries(stats react)
+
+add_executable(defines defines.cpp)
+target_link_libraries(defines react)

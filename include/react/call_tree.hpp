@@ -230,6 +230,22 @@ public:
 		return action_node;
 	}
 
+	/*!
+	 * \brief Finds a child with \a action_code to \a node or creates new if does not exists
+	 * \param node Target parent node
+	 * \param action_code Child's action code
+	 * \return Pointer to child found or NO_NODE
+	 */
+	p_node_t find_link(p_node_t node, int action_code) {
+		if (!actions_set.code_is_valid(action_code)) {
+			throw std::invalid_argument("Can't add new link: action code is invalid");
+		}
+
+		node_t::Container &links = nodes[node].links;
+		auto it = std::find_if(links.rbegin(), links.rend(), [&](const node_t::Container::value_type &v){return v.first == action_code;});
+		return it == links.rend() ? call_tree_t::NO_NODE : it->second;
+	}
+
 	template<typename T>
 	void add_stat(const std::string &key, T value) {
 		stats[key] = value;

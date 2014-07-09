@@ -12,3 +12,6 @@ target_link_libraries(stats react)
 
 add_executable(defines defines.cpp)
 target_link_libraries(defines react)
+
+add_executable(global_profile global_profile.cpp)
+target_link_libraries(global_profile react)

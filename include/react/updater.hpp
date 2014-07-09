@@ -111,17 +111,19 @@ public:
 	/*!
 	 * \brief Starts new branch in tree with action \a action_code
 	 * \param action_code Code of new action
+	 * \param try_merging If true will add execution time to the last child with action code if exists.
 	 */
-	void start(const int action_code) {
-		start(action_code, std::chrono::system_clock::now());
+	void start(const int action_code, bool try_merging = false) {
+		start(action_code, std::chrono::system_clock::now(), try_merging);
 	}
 
 	/*!
 	 * \brief Starts new branch in tree with action \a action_code and with specified start time
 	 * \param action_code Code of new action
 	 * \param start_time Action start time
+	 * \param try_merging If true will add execution time to the last child with action code if exists.
 	 */
-	void start(const int action_code, const time_point_t& start_time) {
+	void start(const int action_code, const time_point_t& start_time, bool try_merging = false) {
 		if (!action_code_is_valid(action_code)) {
 			throw std::invalid_argument(
 						"Can't start action: action code is invalid: "
@@ -135,12 +137,20 @@ public:
 		}
 
 		p_node_t next_node = call_tree_t::NO_NODE;
+		bool is_merging = false;
 		{
 			std::lock_guard<concurrent_call_tree_t> guard(*call_tree);
-			next_node = call_tree->get_call_tree().add_new_link(current_node, action_code);
+			if (try_merging) {
+				next_node = call_tree->get_call_tree().find_link(current_node, action_code);
+				is_merging = next_node != call_tree_t::NO_NODE;
+			}
+
+			if (next_node == call_tree_t::NO_NODE) {
+				next_node = call_tree->get_call_tree().add_new_link(current_node, action_code);
+			}
 		}
 
-		measurements.emplace(start_time, current_node);
+		measurements.emplace(start_time, current_node, is_merging);
 		current_node = next_node;
 	}
 
@@ -297,9 +307,10 @@ private:
 		 * \brief Initializes measurement with specified start time and pointer to previous node in call stack
 		 * \param time Start time
 		 * \param previous_node Pointer to previous node in call stack
+		 * \param merging Flag that this measurment should be merged
 		 */
-		measurement(const time_point_t& time, p_node_t previous_node): start_time(time),
-			previous_node(previous_node) {}
+		measurement(const time_point_t& time, p_node_t previous_node, bool merging = false): start_time(time),
+			previous_node(previous_node), is_merging(merging) {}
 
 		/*!
 		 * \brief Start time of the measurement
@@ -310,6 +321,11 @@ private:
 		 * \brief Pointer to previous node in call stack
 		 */
 		p_node_t previous_node;
+
+		/*!
+		 * \brief If this is a merging measurement
+		 */
+		bool is_merging;
 	};
 
 	/*!
@@ -319,8 +335,14 @@ private:
 	void pop_measurement(const time_point_t& stop_time = std::chrono::system_clock::now()) {
 		measurement previous_measurement = measurements.top();
 		measurements.pop();
-		call_tree->get_call_tree().set_node_start_time(current_node, delta(time_point_t(), previous_measurement.start_time));
-		call_tree->get_call_tree().set_node_stop_time(current_node, delta(time_point_t(), stop_time));
+		if (previous_measurement.is_merging) {
+			int64_t run_time = delta(previous_measurement.start_time, stop_time);
+			int64_t stop_time = call_tree->get_call_tree().get_node_stop_time(current_node);
+			call_tree->get_call_tree().set_node_stop_time(current_node, stop_time + run_time);
+		} else {
+			call_tree->get_call_tree().set_node_start_time(current_node, delta(time_point_t(), previous_measurement.start_time));
+			call_tree->get_call_tree().set_node_stop_time(current_node, delta(time_point_t(), stop_time));
+		}
 		current_node = previous_measurement.previous_node;
 		--trace_depth;
 	}
@@ -360,11 +382,12 @@ public:
 	 * \brief Initializes guard and starts action with \a action_code
 	 * \param updater Updater whos start is called
 	 * \param action_code Code of new action
+	 * \param merge When true call tree nodes with the same path are merged, instead of adding a new child
 	 */
-	action_guard_t(call_tree_updater_t *updater, const int action_code):
+	action_guard_t(call_tree_updater_t *updater, const int action_code, bool merge = false):
 		updater(updater), action_code(action_code), is_stopped(false) {
 		if (updater) {
-			updater->start(action_code);
+			updater->start(action_code, merge);
 		}
 	}
 

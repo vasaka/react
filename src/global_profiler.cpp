@@ -19,6 +19,8 @@
 
 namespace react {
 
+global_profiler_t global_profiler_t::m_profiler("log.react");
+
 std::string get_thread_id() {
 	std::ostringstream ss;
 	ss << std::this_thread::get_id();
@@ -78,8 +80,7 @@ react::actions_set_t& global_profiler_t::get_action_set() {
 
 global_profiler_t& global_profiler_t::get_profiler()
 {
-	static global_profiler_t profiler("log.react");
-	return profiler;
+	return m_profiler;
 }
 
 }

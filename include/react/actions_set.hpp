@@ -20,6 +20,7 @@
 #include <vector>
 #include <stdexcept>
 #include <algorithm>
+#include <mutex>
 
 namespace react {
 
@@ -49,6 +50,7 @@ public:
 	 * \return Newly created action's code or code of already existing action with \a action_name
 	 */
 	int define_new_action(const std::string& action_name) {
+		std::lock_guard<std::mutex> lock(define_new_action_mutex);
 		auto it = std::find(actions_names.begin(), actions_names.end(), action_name);
 		if (it != actions_names.end()) {
 			return std::distance(actions_names.begin(), it);
@@ -88,6 +90,11 @@ private:
 	 * \brief Map between actions codes and actions names
 	 */
 	std::vector<std::string> actions_names;
+
+	/*!
+	 * \brief Define new action synchronization
+	 */
+	std::mutex define_new_action_mutex;
 };
 
 } // namespace react

@@ -153,6 +153,11 @@ private:
 	 * \brief If continuous output active.
 	 */
 	bool							m_active;
+
+	/*!
+	 * \brief Profiler instance.
+	 */
+	static global_profiler_t		m_profiler;
 };
 
 }
